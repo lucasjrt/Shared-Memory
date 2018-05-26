@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <semaphore.h>
+#include <signal.h>
 
 struct shmem {
 	int vetor[18]; // {[0...9] = dados f1, [10] = tam f1, [11] = ctl f1, [12...18] = pid processos}
@@ -18,7 +19,7 @@ void consome();
 
 struct shmem *shared_memory; 
 
-//retorna 1 se sucesso, -1 se a fila estiver cheia, 0 se a fila estiver esvaziando
+//retorna 1 se sucesso, -1 se a fila estiver cheia
 int enfileira_f1() {
 	sem_wait(&shared_memory->mutex);
 	int valor = rand() % 1000 + 1;
@@ -34,16 +35,14 @@ int enfileira_f1() {
 		}
 		printf("}\n");
 		return 1;
-	} else if (shared_memory->vetor[10] == 10 && shared_memory->vetor[11]) { //se a fila estiver cheia e ainda não foi definida como esvaziando
-		printf("Fila esvaziando, tamanho atual: %d\n", shared_memory->vetor[10]);
+	} else if (shared_memory->vetor[10] == 10 && shared_memory->vetor[11] || shared_memory->vetor[10] > 0 && !shared_memory->vetor[11]) { //se a fila estiver cheia e ainda não foi definida como esvaziando
+		printf("Solicitando a fila esvaziar: %d\n", shared_memory->vetor[10]);
 		shared_memory->vetor[11] = 0; //define a fila como esvaziando
+		kill(shared_memory->vetor[15], SIGUSR1);
 		return -1;
 	} else if (shared_memory->vetor[10] == 0 && shared_memory->vetor[11]){ // se a fila estiver vazia e ainda não foi definida como enchendo
 		shared_memory->vetor[11] = 1;
 		return 1;
-	} else if(shared_memory->vetor[10] > 0 && !shared_memory->vetor[11]) {
-		printf("Fila esvaziando, tamanho atual: %d\n", shared_memory->vetor[10]);
-		return 0;
 	} else {
 		printf("Fila cheia\n");
 		return -1;
@@ -52,14 +51,18 @@ int enfileira_f1() {
 
 //retorna 1 se suscesso, -1 se a fila estiver vazia
 int desenfileira_f1() {
+	sem_wait(&shared_memory->mutex);
 	int i, valor;
-	if(shared_memory->vetor[10] > 0 && !shared_memory->vetor[11]) {
-		printf("Processo de pid %d desenfileirando em f1\n", getpid());
+	int tam = shared_memory->vetor[10];
+	if(shared_memory->vetor[10] >= 0 && !shared_memory->vetor[11]) {
+		printf("Processo de pid %d desenfileirando em f1, tamanho da fila: %d\n", getpid(), shared_memory->vetor[10]);
 		valor = shared_memory->vetor[0];
-		printf("Vetor: {");
-		for(i = 0; i < shared_memory->vetor[10]; i++) {
-			printf("%d", shared_memory->vetor[i]);
-			if(i = shared_memory->vetor[10] - 1) printf(", ");
+		printf("Removendo o valor %d da fila\n", valor);
+		printf("Valor da posicao 4 da fila: %d\n", shared_memory->vetor[3]);
+		printf("Vetor em %d: {", getpid());
+		for(i = 0; i < tam; i++) {
+			printf("[%d] = %d",i , shared_memory->vetor[i]);
+			if(i = tam - 1) printf(", ");
 		}
 		printf("}\n");
 		for(i = 0; i < shared_memory->vetor[10] - 1; i++) {
@@ -129,32 +132,27 @@ int main() {
 
 	if(p1 == 0) { //p1
 		for(;;) {
-			sleep(1);
-			if(enfileira_f1() == -1) {
-				kill(shared_memory->vetor[16], SIGUSR1);
-			}
+			enfileira_f1();
 			sem_post(&shared_memory->mutex);
+			sleep(1);
 		}
 	}
 	if(p2 == 0) { //p2
  		for(;;) {
-			sleep(1);
-			if(enfileira_f1() == -1) {
-				kill(shared_memory->vetor[16], SIGUSR1);
-			}
+			enfileira_f1();
 			sem_post(&shared_memory->mutex);
+			sleep(1);
 		}
  	} else if(p3 == 0) { //p3
  		for(;;) {
-			sleep(1);
-			if(enfileira_f1() == -1) {
-				kill(shared_memory->vetor[16], SIGUSR1);
-			}
+			enfileira_f1();
 			sem_post(&shared_memory->mutex);
+			sleep(1);
 		}
 	} else if(p4 == 0) { //p4
 		for(;;) {
 			signal(SIGUSR1, consome);
+			sem_post(&shared_memory->mutex);
 		}
 	} else if(p5 == 0) { //p5
 
