@@ -50,6 +50,6 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
-init
-filosofo
-filosofo_2
+/init
+/filosofo
+/filosofo_2
