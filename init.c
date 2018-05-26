@@ -9,7 +9,9 @@
 #include <signal.h>
 
 struct shmem {
-	int vetor[18]; // {[0...9] = dados f1, [10] = tam f1, [11] = ctl f1, [12...18] = pid processos}
+	int vetor[10]; // {[0...9] = dados f1, [10] = tam f1, [11] = ctl f1, [12...18] = pid processos}
+	int pids[7];
+	int tam, ctl;
 	sem_t mutex;
 };
 
@@ -23,25 +25,25 @@ struct shmem *shared_memory;
 int enfileira_f1() {
 	sem_wait(&shared_memory->mutex);
 	int valor = rand() % 1000 + 1;
-	int i; //shared_memory->vetor[11] = ctl: 0 esvaziando, 1 enchendo
-	if(shared_memory->vetor[10] < 10 && shared_memory->vetor[11]) { //contorle de tamanho, vetor[10] = tamanho fila
+	int i; //shared_memory->ctl = ctl: 0 esvaziando, 1 enchendo
+	if(shared_memory->tam < 10 && shared_memory->ctl) { //contorle de tamanho, tam = tamanho fila
 		printf("Processo de pid %d enfileirando em f1\n", getpid());
-		shared_memory->vetor[shared_memory->vetor[10]] = valor;
-		shared_memory->vetor[10]++; //vetor[10] = tam
+		shared_memory->vetor[shared_memory->tam] = valor;
+		shared_memory->tam++; //tam = tam
 		printf("Vetor em %d: {", getpid());
-		for(i = 0; i < shared_memory->vetor[10]; i++) {
+		for(i = 0; i < shared_memory->tam; i++) {
 			printf("[%d] = %d",i , shared_memory->vetor[i]);
-			if(i != shared_memory->vetor[10] - 1) printf(", ");
+			if(i != shared_memory->tam - 1) printf(", ");
 		}
 		printf("}\n");
 		return 1;
-	} else if (shared_memory->vetor[10] == 10 && shared_memory->vetor[11] || shared_memory->vetor[10] > 0 && !shared_memory->vetor[11]) { //se a fila estiver cheia e ainda não foi definida como esvaziando
-		printf("Solicitando a fila esvaziar: %d\n", shared_memory->vetor[10]);
-		shared_memory->vetor[11] = 0; //define a fila como esvaziando
+	} else if ((shared_memory->tam == 10 && shared_memory->ctl) || (shared_memory->tam > 0 && !shared_memory->ctl)) { //se a fila estiver cheia e ainda não foi definida como esvaziando
+		printf("Solicitando a fila esvaziar: %d\n", shared_memory->tam);
+		shared_memory->ctl = 0; //define a fila como esvaziando
 		kill(shared_memory->vetor[15], SIGUSR1);
 		return -1;
-	} else if (shared_memory->vetor[10] == 0 && shared_memory->vetor[11]){ // se a fila estiver vazia e ainda não foi definida como enchendo
-		shared_memory->vetor[11] = 1;
+	} else if (shared_memory->tam == 0 && shared_memory->ctl){ // se a fila estiver vazia e ainda não foi definida como enchendo
+		shared_memory->ctl = 1;
 		return 1;
 	} else {
 		printf("Fila cheia\n");
@@ -53,9 +55,9 @@ int enfileira_f1() {
 int desenfileira_f1() {
 	sem_wait(&shared_memory->mutex);
 	int i, valor;
-	int tam = shared_memory->vetor[10];
-	if(shared_memory->vetor[10] >= 0 && !shared_memory->vetor[11]) {
-		printf("Processo de pid %d desenfileirando em f1, tamanho da fila: %d\n", getpid(), shared_memory->vetor[10]);
+	int tam = shared_memory->tam;
+	if(shared_memory->tam >= 0 && !shared_memory->ctl) {
+		printf("Processo de pid %d desenfileirando em f1, tamanho da fila: %d\n", getpid(), shared_memory->tam);
 		valor = shared_memory->vetor[0];
 		printf("Removendo o valor %d da fila\n", valor);
 		printf("Valor da posicao 4 da fila: %d\n", shared_memory->vetor[3]);
@@ -65,10 +67,10 @@ int desenfileira_f1() {
 			if(i = tam - 1) printf(", ");
 		}
 		printf("}\n");
-		for(i = 0; i < shared_memory->vetor[10] - 1; i++) {
+		for(i = 0; i < shared_memory->tam - 1; i++) {
 			shared_memory->vetor[i] = shared_memory->vetor[i+1];
 		}
-		shared_memory->vetor[10] --;
+		shared_memory->tam --;
 		return valor;
 	} 
 	return -1;
@@ -89,13 +91,13 @@ int main() {
 	//memória compartilhada
 	
 	int status;
-	int i, segment_id, segment_size = 12 * sizeof(int);
+	int i, segment_id, segment_size = sizeof(struct shmem*);
 
 	segment_id = shmget(IPC_PRIVATE, segment_size, IPC_CREAT | S_IRUSR | S_IWUSR); //
 	shared_memory = (struct shmem*) shmat(segment_id, 0, 0);
 	shmctl(segment_id, IPC_STAT, NULL);
-	shared_memory->vetor[10] = 0; //tam f1
-	shared_memory->vetor[11] = 1; //define a fila como enchendo na inicialização
+	shared_memory->tam = 0; //tam f1
+	shared_memory->ctl = 1; //define a fila como enchendo na inicialização
 
 	//semáforo
 	sem_init(&shared_memory->mutex, 1, 1); //endereço do semaforo, 0- compartilhado entre threads e 1 - compartilhado entre processos, valor inicial do semáforo
@@ -103,66 +105,54 @@ int main() {
 	srand(time(NULL));
 	int random;
 
-	pid_t p1 = -1;
-	pid_t p2 = -1;
-	pid_t p3 = -1;
-	pid_t p4 = -1;
-	pid_t p5 = -1;
-	pid_t p6 = -1;
-	pid_t p7 = -1;
+	for(i = 0; i < 7; i++) {
+		shared_memory->pids[i] = -1;
+	}
 
+	shared_memory->pids[0] = fork();
+	if(shared_memory->pids[0] > 0) shared_memory->pids[1] = fork();
+	if(shared_memory->pids[0] > 0 && shared_memory->pids[1] > 0) shared_memory->pids[2] = fork();
+	if(shared_memory->pids[0] > 0 && shared_memory->pids[1] > 0 && shared_memory->pids[2] > 0) shared_memory->pids[3] = fork();
+	if(shared_memory->pids[0] > 0 && shared_memory->pids[1] > 0 && shared_memory->pids[2] > 0 && shared_memory->pids[3] > 0) shared_memory->pids[4] = fork();
+	if(shared_memory->pids[0] > 0 && shared_memory->pids[1] > 0 && shared_memory->pids[2] > 0 && shared_memory->pids[3] > 0 && shared_memory->pids[4] > 0) shared_memory->pids[5] = fork();
+	if(shared_memory->pids[0] > 0 && shared_memory->pids[1] > 0 && shared_memory->pids[2] > 0 && shared_memory->pids[3] > 0 && shared_memory->pids[4] > 0 && shared_memory->pids[5]>0) shared_memory->pids[6] = fork();
 
-	p1 = fork();
-	if(p1 > 0) p2 = fork();
-	if(p1 > 0 && p2 > 0) p3 = fork();
-	if(p1 > 0 && p2 > 0 && p3 > 0) p4 = fork();
-	if(p1 > 0 && p2 > 0 && p3 > 0 && p4 > 0) p5 = fork();
-	if(p1 > 0 && p2 > 0 && p3 > 0 && p4 > 0 && p5 > 0) p6 = fork();
-	if(p1 > 0 && p2 > 0 && p3 > 0 && p4 > 0 && p5 > 0 && p6>0) p7 = fork();
-
-	if(p1 > 0 && p2 > 0 && p3 > 0 && p4 > 0 && p5 > 0 && p6>0 && p7 > 0) { //pai
-		shared_memory->vetor[12] = p1;
-		shared_memory->vetor[13] = p2;
-		shared_memory->vetor[14] = p3;
-		shared_memory->vetor[15] = p4;
-		shared_memory->vetor[16] = p5;
-		shared_memory->vetor[17] = p6;
-		shared_memory->vetor[18] = p7;
-	} 
-
-	if(p1 == 0) { //p1
+	if(shared_memory->pids[0] == 0) { //p1
 		for(;;) {
 			enfileira_f1();
+			printf("Enfileirou, aumentando o semáforo\n");
 			sem_post(&shared_memory->mutex);
 			sleep(1);
 		}
 	}
-	if(p2 == 0) { //p2
+	if(shared_memory->pids[1] == 0) { //p2
  		for(;;) {
 			enfileira_f1();
+			printf("Enfileirou, aumentando o semáforo\n");
 			sem_post(&shared_memory->mutex);
 			sleep(1);
 		}
- 	} else if(p3 == 0) { //p3
+ 	} else if(shared_memory->pids[2] == 0) { //p3
  		for(;;) {
 			enfileira_f1();
+			printf("Enfileirou, aumentando o semáforo\n");
 			sem_post(&shared_memory->mutex);
 			sleep(1);
 		}
-	} else if(p4 == 0) { //p4
+	} else if(shared_memory->pids[3] == 0) { //p4
 		for(;;) {
 			signal(SIGUSR1, consome);
 			sem_post(&shared_memory->mutex);
 		}
-	} else if(p5 == 0) { //p5
+	} else if(shared_memory->pids[4] == 0) { //p5
 
-	} else if(p6 == 0) { //p6
+	} else if(shared_memory->pids[5] == 0) { //p6
 
-	} else if(p7 == 0) { //p7
+	} else if(shared_memory->pids[6] == 0) { //p7
 
 	}
 	shmdt(shared_memory);
-	if(p1 > 0 && p2 > 0 && p3 > 0 && p4 > 0 && p5 > 0 && p6>0 && p7 > 0) { //pai
+	if(shared_memory->pids[0] > 0 && shared_memory->pids[1] > 0 && shared_memory->pids[2] > 0 && shared_memory->pids[3] > 0 && shared_memory->pids[4] > 0 && shared_memory->pids[5] > 0 && shared_memory->pids[6] > 0) { //pai
 		for(i = 0; i < 7; i++) {
 			wait(&status);
 		}
