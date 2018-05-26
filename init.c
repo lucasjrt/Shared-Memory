@@ -19,6 +19,7 @@ struct shmem {
 int enfileira_f1();
 int desenfileira_f1();
 void consome();
+void thread_init();
 
 struct shmem *shared_memory; 
 
@@ -52,7 +53,6 @@ int enfileira_f1() {
 			return 1;
 		}
 	}  else {
-		printf("Fila esvaziando\n");
 		return -1;
 	}
 }
@@ -82,24 +82,33 @@ int desenfileira_f1() {
 
 void consome() {
 	int i;
-	printf("Consome\n");
-	for (i = 0; i < 10; i++) {
+	for (i = 0; i < 5; i++) {
 		sem_wait(&shared_memory->mutex);
 		desenfileira_f1();
 		sem_post(&shared_memory->mutex);
+		sleep(1);
 	}
 	shared_memory->ctl = 1;
 }
 
-int main() {
+void thread_init() {
+	int i;
+	pthread_t threads[2];
+	for (i = 0; i < 2; i++) {
+		pthread_create(&threads[i], NULL, (void*) consome, NULL);
+	}
+	for(i = 0; i < 2; i++) {
+		pthread_join(threads[i], NULL);
+	}
+}
 
-	//memória compartilhada
-	
+int main() {
 	int status;
 	int i, segment_id, segment_size = sizeof(struct shmem*);
 	pid_t pai = getpid();
 
-	segment_id = shmget(IPC_PRIVATE, segment_size, IPC_CREAT | S_IRUSR | S_IWUSR); //
+	//iniciando memória compartilhada
+	segment_id = shmget(IPC_PRIVATE, segment_size, IPC_CREAT | 0666); //
 	shared_memory = (struct shmem*) shmat(segment_id, 0, 0);
 	shmctl(segment_id, IPC_STAT, NULL);
 	shared_memory->tam = 0; //tam f1
@@ -149,7 +158,7 @@ int main() {
 		}
 	} else if(pids[3] == 0) { //p4
 		for(;;) {
-			signal(SIGUSR1, consome);
+			signal(SIGUSR1, thread_init);
 		}
 	} else if(pids[4] == 0) { //p5
 
