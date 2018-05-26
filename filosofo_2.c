@@ -36,7 +36,7 @@ void comer(int id) {
 				garfos[0] = 1;
 				garfos[4] = 1;
 				printf("Filosofo %d comendo por % d segundos\n", id, n);
-				sleep(n);
+				//sleep(n);
 				garfos[0] = 0;
 				garfos[4] = 0;
 				sem_post(&mutex);
@@ -46,7 +46,7 @@ void comer(int id) {
 				else if(garfos[4]) {
 					printf("Garfo esquerdo do filosofo %d ocupado\n", id);
 				}
-				sleep(1);
+				//sleep(1);
 				comer(id);
 			}
 			break;
@@ -56,7 +56,7 @@ void comer(int id) {
 				garfos[1] = 1;
 				garfos[0] = 1;
 				printf("Filosofo %d comendo por % d segundos\n", id, n);
-				sleep(n);
+				//sleep(n);
 				garfos[1] = 0;
 				garfos[0] = 0;
 				sem_post(&mutex);
@@ -66,7 +66,7 @@ void comer(int id) {
 				else if(garfos[0]) {
 					printf("Garfo esquerdo do filosofo %d ocupado\n", id);
 				}
-				sleep(1);
+				//sleep(1);
 				comer(id);
 			}
 			break;
@@ -76,7 +76,7 @@ void comer(int id) {
 				garfos[2] = 1;
 				garfos[1] = 1;
 				printf("Filosofo %d comendo por % d segundos\n", id, n);
-				sleep(n);
+				//sleep(n);
 				garfos[2] = 0;
 				garfos[1] = 0;
 				sem_post(&mutex);
@@ -86,7 +86,7 @@ void comer(int id) {
 				else if(garfos[1]) {
 					printf("Garfo esquerdo do filosofo %d ocupado\n", id);
 				}
-				sleep(1);
+				//sleep(1);
 				comer(id);
 			}
 			break;
@@ -96,7 +96,7 @@ void comer(int id) {
 				garfos[3] = 1;
 				garfos[2] = 1;
 				printf("Filosofo %d comendo por % d segundos\n", id, n);
-				sleep(n);
+				//sleep(n);
 				garfos[3] = 0;
 				garfos[2] = 0;
 				sem_post(&mutex);
@@ -106,7 +106,7 @@ void comer(int id) {
 				else if(garfos[2]) {
 					printf("Garfo esquerdo do filosofo %d ocupado\n", id);
 				}
-				sleep(1);
+				//sleep(1);
 				comer(id);
 			}
 			break;
@@ -116,7 +116,7 @@ void comer(int id) {
 				garfos[4] = 1;
 				garfos[3] = 1;
 				printf("Filosofo %d comendo por % d segundos\n", id, n);
-				sleep(n);
+				//sleep(n);
 				garfos[4] = 0;
 				garfos[3] = 0;
 				sem_post(&mutex);
@@ -126,7 +126,7 @@ void comer(int id) {
 				else if(garfos[3]) {
 					printf("Garfo esquerdo do filosofo %d ocupado\n", id);
 				}
-				sleep(1);
+				//sleep(1);
 				comer(id);
 			}
 			break;
@@ -136,7 +136,7 @@ void comer(int id) {
 void pensar(int id) {
 	int n = rand() % 3 + 1;
 	printf("Filosofo %d pensando por %d segundos\n", filosofos[id], n);
-	sleep(n);
+	//sleep(n);
 
 }
 
